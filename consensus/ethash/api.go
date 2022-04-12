@@ -17,11 +17,13 @@
 package ethash
 
 import (
+	"context"
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 var errEthashStopped = errors.New("ethash stopped")
@@ -38,29 +40,59 @@ type API struct {
 //   result[1] - 32 bytes hex encoded seed hash used for DAG
 //   result[2] - 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
 //   result[3] - hex encoded block number
-func (api *API) GetWork() ([4]string, error) {
+func (api *API) GetWork() ([10]string, error) {
 	if api.ethash.remote == nil {
-		return [4]string{}, errors.New("not supported")
+		return [10]string{}, errors.New("not supported")
 	}
 
 	var (
-		workCh = make(chan [5]string, 1)
+		workCh = make(chan [10]string, 1)
 		errc   = make(chan error, 1)
 	)
 	select {
 	case api.ethash.remote.fetchWorkCh <- &sealWork{errc: errc, res: workCh}:
 	case <-api.ethash.remote.exitCh:
-		return [4]string{}, errEthashStopped
+		return [10]string{}, errEthashStopped
 	}
 	select {
 	case fullWork := <-workCh:
-		var work [4]string
-		copy(work[:], fullWork[:4])
+		var work [10]string
+		copy(work[:], fullWork[:10])
 
 		return work, nil
 	case err := <-errc:
-		return [4]string{}, err
+		return [10]string{}, err
 	}
+}
+
+// NewWorks send a notification each time a new work is available for mining.
+func (api *API) NewWorks(ctx context.Context) (*rpc.Subscription, error) {
+	notifier, supported := rpc.NotifierFromContext(ctx)
+	if !supported {
+		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
+	}
+
+	rpcSub := notifier.CreateSubscription()
+
+	go func() {
+		works := make(chan [10]string)
+		worksSub := api.ethash.scope.Track(api.ethash.workFeed.Subscribe(works))
+
+		for {
+			select {
+			case h := <-works:
+				notifier.Notify(rpcSub.ID, h)
+			case <-rpcSub.Err():
+				worksSub.Unsubscribe()
+				return
+			case <-notifier.Closed():
+				worksSub.Unsubscribe()
+				return
+			}
+		}
+	}()
+
+	return rpcSub, nil
 }
 
 // SubmitWork can be used by external miner to submit their POW solution.
