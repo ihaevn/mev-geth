@@ -52,6 +52,25 @@ Going through all the possible command line flags is out of scope here (please c
 but we've enumerated a few common parameter combos to get you up to speed quickly
 on how you can run your own `geth` instance.
 
+<<<<<<< HEAD
+=======
+### Hardware Requirements
+
+Minimum:
+
+* CPU with 2+ cores
+* 4GB RAM
+* 500GB free storage space to sync the Mainnet
+* 8 MBit/sec download Internet service
+
+Recommended:
+
+* Fast CPU with 4+ cores
+* 16GB+ RAM
+* High Performance SSD with at least 500GB free space
+* 25+ MBit/sec download Internet service
+
+>>>>>>> 9b62e981e98ad44b2f39ece2de605d7fa0e9816a
 ### Full node on the main Ethereum network
 
 By far the most common scenario is people wanting to simply interact with the Ethereum
